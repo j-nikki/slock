@@ -10,12 +10,12 @@ set(SLOCK_FLAGS
     -march=native -Ofast -fno-exceptions
     -Wpedantic -Wall -Wextra)
 
-add_library(ebz explicit_bzero.c)
-add_library(image image.c)
-target_link_options(image PRIVATE -L/usr/X11R6/lib -lX11)
+add_library(clibs explicit_bzero.c image.c)
+target_compile_options(clibs PRIVATE -std=gnu99 ${SLOCK_FLAGS})
+target_link_options(clibs PRIVATE -L/usr/X11R6/lib -lX11)
 
 add_executable(slock slock.cpp threads.cpp ../config.h)
-target_link_libraries(slock ebz image)
+target_link_libraries(slock clibs)
 target_compile_options(slock PUBLIC -std=gnu++2b ${SLOCK_FLAGS})
 target_link_options(slock PRIVATE -s -L/usr/lib -lc -lcrypt -L/usr/X11R6/lib -lX11 -lXinerama -lXft -lXext -lXrandr)
 
