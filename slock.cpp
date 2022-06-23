@@ -9,7 +9,6 @@
 #include <X11/extensions/Xinerama.h>
 #include <X11/extensions/Xrandr.h>
 #include <X11/keysym.h>
-#include <chrono>
 #include <ctype.h>
 #include <errno.h>
 #include <fcntl.h>
@@ -19,7 +18,6 @@
 #include <pwd.h>
 #include <shadow.h>
 #include <signal.h>
-#include <source_location>
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -27,14 +25,17 @@
 #include <sys/eventfd.h>
 #include <sys/shm.h>
 #include <sys/types.h>
-#include <thread>
 #include <unistd.h>
 #include <utility>
 
 #include "arg.h"
+#include "image.h"
+#include "threads.h"
+#include "timer.h"
 #include "util.h"
 
-#define STRINGIFY(X) #X
+#define STRINGIFY(X)     STRINGIFY_exp(X)
+#define STRINGIFY_exp(X) #X
 
 char *argv0;
 
@@ -42,15 +43,7 @@ enum { BACKGROUND, INIT, INPUT, FAILED, NUMCOLS };
 
 #include "config.h"
 
-#define BPP 4
-struct shmimage {
-    XShmSegmentInfo shminfo;
-    XImage *ximage;
-    unsigned int *data; // will point to the image's BGRA packed pixels
-};
-void initimage(struct shmimage *image);
-void destroyimage(Display *dsp, struct shmimage *image);
-int createimage(Display *dsp, struct shmimage *image, int width, int height);
+timer g_t(false);
 
 struct lock {
     shmimage shim;
@@ -266,56 +259,6 @@ static void readpw(Display *dpy, struct xrandr *rr, struct lock **locks, int nsc
     }
 }
 
-bool g_timer = false;
-struct timer {
-    char buf_[2048], *dit_ = buf_;
-    const std::chrono::high_resolution_clock::time_point start_ =
-        std::chrono::high_resolution_clock::now();
-    void finish()
-    {
-        if (!g_timer) [[likely]]
-            return;
-        const auto dur = (std::chrono::high_resolution_clock::now() - start_).count() / 1000000.;
-        printf("%17.3fms %s\n%s", dur, std::source_location::current().file_name(), buf_);
-        dit_ = buf_;
-    }
-    ~timer()
-    {
-        if (dit_ != buf_) finish();
-    }
-    auto operator()(const char *name, auto &&f,
-                    std::source_location sl = std::source_location::current()) -> decltype(f())
-    {
-        if constexpr (std::is_void_v<decltype(f())>) {
-            return (void)operator()(
-                name, [&] { return f(), 0; }, sl);
-        } else {
-            const auto start   = std::chrono::high_resolution_clock::now();
-            decltype(auto) res = f();
-            if (!g_timer) [[likely]]
-                return res;
-            const auto dur = (std::chrono::high_resolution_clock::now() - start).count() / 1000000.;
-            dit_ += sprintf(dit_, "%17.3fms %s:%d:%d (%s)\n", dur, sl.file_name(), sl.line(),
-                            sl.column(), name ? name : sl.function_name());
-            return res;
-        }
-    }
-} g_t;
-
-const int nthr = std::max(1u, std::thread::hardware_concurrency() / 2);
-struct threads {
-    alignas(std::jthread) char b_[sizeof(std::jthread) * 64];
-    std::jthread *begin() { return reinterpret_cast<std::jthread *>(b_); }
-    std::jthread *end() { return begin() + nthr; }
-    threads(auto &&f)
-    {
-        for (int i = 0; i < nthr - 1; ++i)
-            new (begin() + i) std::jthread{f, i};
-        f(nthr - 1);
-    }
-    ~threads() { std::destroy_n(begin(), nthr - 1); }
-};
-
 static struct lock *lockscreen(Display *dpy, struct xrandr *rr, int screen)
 {
     char curs[] = {0, 0, 0, 0, 0, 0, 0, 0};
@@ -501,7 +444,7 @@ int main(int argc, char **argv)
     ARGBEGIN
     {
     case 'v': fprintf(stderr, "slock-" STRINGIFY(VERSION) "\n"); return 0;
-    case 't': g_timer = true; break;
+    case 't': g_t.enable(); break;
     default: usage();
     }
     ARGEND
@@ -571,70 +514,4 @@ int main(int argc, char **argv)
     XSync(dpy, 0);
     XCloseDisplay(dpy);
     return 0;
-}
-
-// following functions from here:
-// https://stackoverflow.com/a/38298349
-
-void initimage(struct shmimage *image)
-{
-    image->ximage          = NULL;
-    image->shminfo.shmaddr = (char *)-1;
-}
-
-void destroyimage(Display *dsp, struct shmimage *image)
-{
-    if (image->ximage) {
-        XShmDetach(dsp, &image->shminfo);
-        XDestroyImage(image->ximage);
-        image->ximage = NULL;
-    }
-
-    if (image->shminfo.shmaddr != (char *)-1) {
-        shmdt(image->shminfo.shmaddr);
-        image->shminfo.shmaddr = (char *)-1;
-    }
-}
-
-int createimage(Display *dsp, struct shmimage *image, int width, int height)
-{
-    // Create a shared memory area
-    image->shminfo.shmid = shmget(IPC_PRIVATE, width * height * BPP, IPC_CREAT | 0606);
-    if (image->shminfo.shmid == -1) {
-        perror("slock");
-        return false;
-    }
-
-    // Map the shared memory segment into the address space of this process
-    image->shminfo.shmaddr = (char *)shmat(image->shminfo.shmid, 0, 0);
-    if (image->shminfo.shmaddr == (char *)-1) {
-        perror("slock");
-        return false;
-    }
-
-    image->data             = (unsigned int *)image->shminfo.shmaddr;
-    image->shminfo.readOnly = false;
-
-    // Mark the shared memory segment for removal
-    // It will be removed even if this program crashes
-    shmctl(image->shminfo.shmid, IPC_RMID, 0);
-
-    // Allocate the memory needed for the XImage structure
-    image->ximage =
-        XShmCreateImage(dsp, XDefaultVisual(dsp, XDefaultScreen(dsp)),
-                        DefaultDepth(dsp, XDefaultScreen(dsp)), ZPixmap, 0, &image->shminfo, 0, 0);
-    if (!image->ximage) {
-        destroyimage(dsp, image);
-        printf("slock: could not allocate the XImage structure\n");
-        return false;
-    }
-
-    image->ximage->data   = (char *)image->data;
-    image->ximage->width  = width;
-    image->ximage->height = height;
-
-    // Ask the X server to attach the shared memory segment and sync
-    XShmAttach(dsp, &image->shminfo);
-    XSync(dsp, false);
-    return true;
 }

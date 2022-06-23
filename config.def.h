@@ -23,6 +23,6 @@ static XRectangle rectangles[9] = {
 
 /* set pixelation radius */
 constexpr inline int pixelSize = 40;
-constexpr inline int colFact   = 6;
+constexpr inline int colFact   = 4;
 constexpr inline int mcFact    = 2;
 constexpr inline int colDsor   = 16;
