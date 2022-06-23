@@ -1,0 +1,24 @@
+cmake_minimum_required(VERSION 3.20)
+
+project(slock)
+
+set(VERSION 1.4)
+
+add_custom_command(
+    OUTPUT "${PROJECT_SOURCE_DIR}/config.h"
+    COMMAND sh -c '[ -f config.h ] || cp config.def.h config.h'
+    WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}")
+
+add_library(ebz explicit_bzero.c)
+add_executable(slock slock.cpp config.h)
+target_link_libraries(slock ebz)
+target_compile_options(slock PUBLIC -std=gnu++2b
+    -D_DEFAULT_SOURCE -DVERSION=${VERSION}
+    -march=native -Ofast -fwhole-program -fno-exceptions
+    -Wpedantic -Wall -Wextra)
+target_link_options(slock PRIVATE -s -L/usr/lib -lc -lcrypt -L/usr/X11R6/lib -lX11 -lXinerama -lXft -lXext -lXrandr)
+
+install(
+    FILES "${PROJECT_BINARY_DIR}/slock"
+    PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE SETUID SETGID
+    DESTINATION bin)

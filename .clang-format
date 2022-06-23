@@ -1,0 +1,19 @@
+ColumnLimit: 100
+BreakBeforeBraces: Linux
+IndentWidth: 4
+AllowShortLambdasOnASingleLine: All
+AllowShortIfStatementsOnASingleLine: WithoutElse
+AlignConsecutiveAssignments: AcrossEmptyLinesAndComments
+ReflowComments: true
+AlwaysBreakTemplateDeclarations: Yes
+CommentPragmas: '^! .*'
+BinPackParameters: true
+IfMacros: ['FOR_CO_AWAIT', 'JUTIL_IF_CONSTEVAL']
+AlignConsecutiveMacros: AcrossEmptyLinesAndComments
+AllowShortCaseLabelsOnASingleLine: true
+BreakBeforeBraces: Custom
+BraceWrapping:
+  AfterFunction: true
+  AfterNamespace: true
+  AfterClass: true
+  SplitEmptyRecord: false

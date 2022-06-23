@@ -9,6 +9,7 @@
 __attribute__((weak)) void
 __explicit_bzero_hook(void *buf, size_t len)
 {
+	(void)buf, (void)len;
 }
 
 void
