@@ -216,11 +216,14 @@ static void readpw(Display *dpy, struct xrandr *rr, struct lock **locks, int nsc
             case XK_BackSpace:
                 if (len) passwd[--len] = '\0';
                 break;
-            case XK_Control_L:
-                explicit_bzero(&passwd, sizeof(passwd));
-                len = 0;
-                system("loginctl suspend -i");
-                break;
+            case XK_s:
+                if (iscntrl((int)buf[0])) {
+                    explicit_bzero(&passwd, sizeof(passwd));
+                    len = 0;
+                    system("loginctl suspend -i");
+                    break;
+                } else
+                    [[fallthrough]];
             default:
                 if (num && !iscntrl((int)buf[0]) && (len + num < sizeof(passwd))) {
                     memcpy(passwd + len, buf, num);
@@ -274,7 +277,6 @@ static struct lock *lockscreen(Display *dpy, struct xrandr *rr, int screen)
     lock->root   = RootWindow(dpy, lock->screen);
 
     if (!XShmQueryExtension(dpy)) die("slock: XSHM extension not supported\n");
-    // const auto scr = XDefaultScreen(dpy);
     initimage(&lock->shim);
     const int imw = XDisplayWidth(dpy, 0);
     const int imh = XDisplayHeight(dpy, 0);
