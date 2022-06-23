@@ -285,10 +285,10 @@ static struct lock *lockscreen(Display *dpy, struct xrandr *rr, int screen)
         [&] { XShmGetImage(dpy, XDefaultRootWindow(dpy), lock->shim.ximage, 0, 0, AllPlanes); });
     g_t("img fx", [&] {
         const auto idata = lock->shim.data;
-        const int hpert  = imh / nthr;
-        if (hpert * nthr != imh || imw / pixelSize * pixelSize != imw) {
+        const int hpert  = imh / threads::nthr;
+        if (hpert * (int)threads::nthr != imh || imw / pixelSize * pixelSize != imw) {
             fprintf(stderr, "slock: warning: pixelSize not factor of gcd(w, h/#t) (%d, %d/%u)\n",
-                    imw, imh, nthr);
+                    imw, imh, threads::nthr);
         }
         threads{[&](const int thr) {
             const int h0 = hpert * thr;

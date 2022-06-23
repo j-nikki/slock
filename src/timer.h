@@ -6,8 +6,8 @@
 class timer
 {
   public:
-    timer(bool enabled = true) : enabled_{enabled} {}
-    void finish()
+    inline timer(bool enabled = true) : enabled_{enabled} {}
+    inline void finish()
     {
         if (!enabled_) [[likely]]
             return;
@@ -15,13 +15,14 @@ class timer
         printf("%17.3fms %s\n%s", dur, std::source_location::current().file_name(), buf_);
         dit_ = buf_;
     }
-    void enable(bool enable = true) { enabled_ = enable; }
-    ~timer()
+    inline void enable(bool enable = true) { enabled_ = enable; }
+    inline ~timer()
     {
         if (dit_ != buf_) finish();
     }
-    auto operator()(const char *name, auto &&f,
-                    std::source_location sl = std::source_location::current()) -> decltype(f())
+    inline auto operator()(const char *name, auto &&f,
+                           std::source_location sl = std::source_location::current())
+        -> decltype(f())
     {
         if constexpr (std::is_void_v<decltype(f())>) {
             return (void)operator()(
