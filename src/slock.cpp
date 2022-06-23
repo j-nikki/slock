@@ -41,7 +41,7 @@ char *argv0;
 
 enum { BACKGROUND, INIT, INPUT, FAILED, NUMCOLS };
 
-#include "config.h"
+#include "../config.h"
 
 timer g_t(false);
 
