@@ -5,10 +5,7 @@ add_custom_command(
     COMMAND sh -c '[ -f ../config.h ] || cp config.def.h ../config.h'
     WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}/src")
 
-set(SLOCK_FLAGS
-    -D_DEFAULT_SOURCE -DVERSION=${SLOCK_VERSION}
-    -march=native -Ofast -fno-exceptions
-    -Wpedantic -Wall -Wextra)
+set(SLOCK_FLAGS -D_DEFAULT_SOURCE -DVERSION=${SLOCK_VERSION})
 
 add_library(clibs explicit_bzero.c image.c)
 target_compile_options(clibs PRIVATE -std=gnu99 ${SLOCK_FLAGS})

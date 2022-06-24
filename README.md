@@ -10,7 +10,7 @@ You need GCC 12+, CMake 3.20+, and the X extensions XShm, Xinerama, Xrandr.
 
 ## Installation
 
-- install:<br>`cmake -B build && sudo cmake --install build`
+- install:<br>`cmake -B build -D CMAKE_BUILD_TYPE=Release && cmake --build build && sudo cmake --install build`
 <br>*note: default prefix (`/usr/local`) can be overridden with `--prefix <dir>`*
 - uninstall:<br>`cat build/install_manifest.txt | sudo xargs rm`
 
